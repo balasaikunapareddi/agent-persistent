@@ -20,6 +20,9 @@ def parse_playbook(path)->Playbook:
             else: n,d=rest,""
             steps.append(PlaybookStep(name=n.strip(), description=d.strip()))
     if not name: name=Path(path).stem
+    if not steps: raise ValueError(f"playbook {path} has no steps: malformed playbook markdown")
+    for s in steps:
+        if not s.name: raise ValueError(f"playbook {path} has a step with an empty name: malformed playbook markdown")
     return Playbook(name=name, steps=steps)
 def load_playbook(name, playbooks_dir=None)->Playbook:
     d=Path(playbooks_dir) if playbooks_dir else default_playbooks_dir()

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+from .prompts import SUMMARIZE_PROMPT, CHANGE_PROMPT, BRIEF_PROMPT
 class StubModel:
     """Deterministic offline model: no API key, no network."""
     name="stub"
@@ -24,9 +25,9 @@ class LiteLLMModel:
         import litellm
         r=litellm.completion(model=self.model, messages=[{"role":"user","content":prompt}])
         return r.choices[0].message.content or ""
-    def summarize(self, text:str)->str: return self.complete(f"Summarize concisely: {text}")
-    def summarize_change(self, old:str, new:str)->str: return self.complete(f"Old:\n{old}\nNew:\n{new}\nSummarize what changed:")
-    def assemble_brief(self, notes:list[str])->str: return self.complete("Assemble a daily brief from these notes:\n"+"\n".join(notes))
+    def summarize(self, text:str)->str: return self.complete(f"{SUMMARIZE_PROMPT} {text}")
+    def summarize_change(self, old:str, new:str)->str: return self.complete(f"{CHANGE_PROMPT}\nOld:\n{old}\nNew:\n{new}")
+    def assemble_brief(self, notes:list[str])->str: return self.complete(f"{BRIEF_PROMPT}\n"+"\n".join(notes))
 def get_model(model=None):
     if model is not None: return model
     if os.environ.get("AGENT_STUB","")=="1": return StubModel()

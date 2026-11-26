@@ -18,6 +18,8 @@ def test_persistence_across_restart(tmp_path):
     g=store.add_goal("produce a daily brief from inbox notes","daily-brief",source="",next_check_at=clock.now())
     agent.tick(); mid=store.get_goal(g.id); assert mid.step_index>=1 and mid.status=="active"
     store.close(); store2=Store(tmp_path/"a.db"); g2=store2.get_goal(g.id); assert g2.step_index==mid.step_index and g2.text==g.text
+    assert g2.status==mid.status and g2.next_check_at==mid.next_check_at
+    assert g2.history==mid.history and g2.step_progress==mid.step_progress
 
 def test_due_goal_selection(tmp_path):
     store,clock,agent=make(tmp_path)
@@ -68,8 +70,8 @@ def test_outbox_only_invariant(tmp_path):
     import agent_persistent.agent as ag, pathlib
     src=pathlib.Path(ag.__file__).parent
     combined=" ".join(p.read_text() for p in src.glob("*.py"))
-    for forbidden in ["smtplib","sendmail","slack_sdk","requests.post","urllib.request.urlopen"]:
-        assert forbidden not in combined
+    for forbidden in ["smtplib","sendmail","slack_sdk","requests","urllib","socket","http.client","subprocess","os.system","webhook"]:
+        assert forbidden not in combined, f"outbox-only invariant violated: {forbidden} in src"
     store,clock,agent=make(tmp_path)
     g=store.add_goal("blocked-ish","daily-brief",next_check_at=clock.now()); agent.tick()
     # notifications, if any, are only rows in DB
@@ -89,6 +91,45 @@ def test_watch_and_summarize_completes(tmp_path):
         clock.advance(3600); agent.tick()
         if store.get_goal(g.id).status=="done": break
     assert store.get_goal(g.id).status=="done"
+
+def test_watch_no_duplicate_notifications_on_rerun(tmp_path):
+    store,clock,agent=make(tmp_path)
+    store.add_goal("produce a daily brief","daily-brief",next_check_at=clock.now())
+    ch=tmp_path/"ch.jsonl"; ch.write_text(json.dumps({"text":"help with brief deadline tomorrow"})+"\n"+json.dumps({"text":"random movie chatter"}))
+    r1=watch_channel(store, ch, store.list_goals(), now=clock.now()); assert r1["spoken"]==1
+    n1=len(store.list_notifications())
+    r2=watch_channel(store, ch, store.list_goals(), now=clock.now())
+    assert r2["spoken"]==0 and r2["skipped"]==2 and len(store.list_notifications())==n1
+
+def test_watch_word_boundary_no_false_positives(tmp_path):
+    store,clock,agent=make(tmp_path)
+    store.add_goal("produce a daily brief","daily-brief",next_check_at=clock.now())
+    ok,_=evaluate_message("briefly sunny afternoon", store.list_goals()); assert not ok
+    ok2,_=evaluate_message("overdue library chat about movies", []); assert not ok2
+
+def test_malformed_playbook_fails_loudly(tmp_path):
+    import pytest
+    from agent_persistent.playbooks import parse_playbook
+    bad=tmp_path/"bad.md"; bad.write_text("# Something else\nno steps here\n")
+    with pytest.raises(ValueError): parse_playbook(bad)
+    # and a goal using it becomes blocked, never silently done
+    pdir=tmp_path/"pbs"; pdir.mkdir(); (pdir/"bad.md").write_text(bad.read_text())
+    store=Store(tmp_path/"x.db"); clock=VirtualClock(); ag=PersistentAgent(store, model=StubModel(), clock=clock, playbooks_dir=str(pdir))
+    g=store.add_goal("do bad thing","bad",next_check_at=clock.now()); ag.tick()
+    assert store.get_goal(g.id).status=="blocked"
+
+def test_blocked_goal_does_not_wedge_other_goals(tmp_path):
+    store,clock,agent=make(tmp_path)
+    gb=store.add_goal("watch missing","watch-and-summarize",source=str(tmp_path/"nope.txt"),next_check_at=clock.now()-100)
+    g2=store.add_goal("produce a daily brief","daily-brief",next_check_at=clock.now())
+    agent.tick(); assert store.get_goal(gb.id).status=="blocked"
+    r=agent.tick(); assert r is not None and r["goal_id"]==g2.id
+
+def test_sql_injection_in_goal_text_is_inert(tmp_path):
+    store,clock,agent=make(tmp_path)
+    evil="x'); DROP TABLE goals;--"
+    g=store.add_goal(evil,"daily-brief",next_check_at=clock.now())
+    assert store.get_goal(g.id).text==evil and len(store.list_goals())==1
 
 def test_demo_passes():
     assert run_demo(verbose=False)==0

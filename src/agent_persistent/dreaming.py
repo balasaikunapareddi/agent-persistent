@@ -2,6 +2,7 @@ from __future__ import annotations
 def dream(store)->dict:
     """Deterministic consolidation: merge duplicates, supersede contradicted (same key, newer wins). Nothing deleted."""
     before=store.list_memories(active_only=True); before_count=len(before)
+    total_before=len(store.list_memories())
     details=[]; merged=0; superseded=0
     # duplicates: normalized content
     seen={}
@@ -24,4 +25,4 @@ def dream(store)->dict:
                 if " ".join(old["content"].lower().split())!=" ".join(keeper["content"].lower().split()):
                     store.set_memory_status(old["id"],"superseded",superseded_by=keeper["id"]); superseded+=1; details.append(f"superseded memory {old['id']} ({old['content']}) by {keeper['id']} ({keeper['content']}) for key {key}")
     after=store.list_memories(active_only=True)
-    return {"before_active":before_count,"after_active":len(after),"total_before":len(store.list_memories()),"total_after":len(store.list_memories()),"duplicates_merged":merged,"superseded":superseded,"details":details}
+    return {"before_active":before_count,"after_active":len(after),"total_before":total_before,"total_after":len(store.list_memories()),"duplicates_merged":merged,"superseded":superseded,"details":details}
