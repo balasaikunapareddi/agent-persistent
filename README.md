@@ -58,6 +58,8 @@ Live test (needs a real model key for `LLM_MODEL`):
 LLM_MODEL=gemini/gemini-3.5-flash-lite python scripts/live_test.py
 ```
 
+Verified live (2026-11-25, gemini/gemini-3.5-flash-lite): the real model worked a seeded daily-brief goal through all three playbook steps across ticks, set its own next check-in, and left a brief, an outbox notification, and a memory write — LIVE TEST PASS. Offline: 15/15 tests, demo 20/20 checks.
+
 CLI:
 
 ```bash
