@@ -1,0 +1,19 @@
+[build-system]
+requires=["setuptools>=68","wheel"]
+build-backend="setuptools.build_meta"
+[project]
+name="agent-persistent"
+version="0.1.0"
+description="A persistent, proactive, goal-oriented agent that runs locally, keeps durable goals in SQLite, wakes on a schedule via LangGraph, follows playbooks, consolidates memory in a dreaming pass, and never sends anything externally."
+readme="README.md"
+requires-python=">=3.10"
+license={text="MIT"}
+dependencies=["langgraph>=0.2","litellm>=1.40"]
+[project.optional-dependencies]
+dev=["pytest>=8"]
+[project.scripts]
+agent-persistent="agent_persistent.cli:main"
+[tool.setuptools.packages.find]
+where=["src"]
+[tool.pytest.ini_options]
+testpaths=["tests"]
